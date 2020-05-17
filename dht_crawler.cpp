@@ -186,7 +186,7 @@ bool dht_crawler::write_result_file() {
 
 	for (auto iter = m_meta.begin(); iter != m_meta.end(); ++iter) {
 
-		const std::string& s = iter->first;
+		const std::string &s = iter->first;
 		for (unsigned int i = 0; i < s.size(); ++i) {
 
 			fs << std::hex;
