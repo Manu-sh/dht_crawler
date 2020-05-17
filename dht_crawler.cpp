@@ -43,7 +43,7 @@ void dht_crawler::run() {
 	cout << "Starting running with" << endl;
 	this->print_settings();
 
-	for (int intervals = 0; intervals < m_total_intervals;) {
+	for (unsigned intervals = 0; intervals < m_total_intervals;) {
 
 		for (unsigned i = 0; i < m_sessions.size(); ++i) {
 			std::vector<lt::alert*> alerts;
@@ -161,6 +161,10 @@ void dht_crawler::create_sessions() {
 			psession->add_dht_router(m_trackers[j]);
 
 		auto settings = psession->get_settings();
+
+		namespace alert_type = lt::alert_category;
+		settings.set_int(lt::settings_pack::int_types::alert_mask, lt::alert::all_categories);
+
 		/*
 		   settings.upload_rate_limit = m_upload_rate_limit;
 		   settings.download_rate_limit = m_download_rate_limit;
