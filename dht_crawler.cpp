@@ -47,11 +47,10 @@ void dht_crawler::run() {
 
 		for (unsigned i = 0; i < m_sessions.size(); ++i) {
 			std::vector<lt::alert*> alerts;
-			m_sessions.at(i)->post_torrent_updates();
 			m_sessions.at(i)->pop_alerts(&alerts);
+			m_sessions.at(i)->post_torrent_updates();
 			this->handle_alerts(m_sessions.at(i), &alerts);
 		}
-
 
 		if (++intervals % m_writing_interval == 0) {
 
