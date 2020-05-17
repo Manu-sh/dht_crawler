@@ -1,107 +1,100 @@
 #include "dht_crawler.h"
-#include "unistd.h"
+
 #include <fstream>
+#include <iostream>
 
-dht_crawler::dht_crawler(std::string result_file, int session_num, int start_port, int total_intervals)
-{
-	this->total_intervals = total_intervals;
-	this->session_num = session_num;
-	this->start_port = start_port;
-	this->result_file = result_file;
-
-	this->trackers.push_back(std::make_pair("router.bittorrent.com", 6881));
-	this->trackers.push_back(std::make_pair("router.utorrent.com", 6881));
-	this->trackers.push_back(std::make_pair("router.bitcomet.com", 6881));
-	this->trackers.push_back(std::make_pair("dht.transmissionbt.com", 6881));
+extern "C" {
+	#include <unistd.h>
 }
 
-void dht_crawler::print_settings(std::ostream& os) const
-{
-	std::cout << "\tupload_rate_limit: " << this->upload_rate_limit << std::endl;
-	std::cout << "\tdownload_rate_limit: " << this->download_rate_limit << std::endl;
-	std::cout << "\tactive_downloads: " << this->active_downloads << std::endl;
-	std::cout << "\talert_queue_size: " << this->alert_queue_size << std::endl;
-	std::cout << "\tdht_announce_interval: " << this->dht_announce_interval << std::endl;
-	std::cout << "\ttorrent_upload_limit: " << this->torrent_upload_limit << std::endl;
-	std::cout << "\ttorrent_download_limit: " << this->torrent_download_limit << std::endl;
-	std::cout << "\tauto_manage_startup: " << this->auto_manage_startup << std::endl;
-	std::cout << "\tauto_manage_interval: " << this->auto_manage_interval << std::endl;
-	std::cout << "\tstart_port: " << this->start_port << std::endl;
-	std::cout << "\tsession_num: " << this->session_num << std::endl;
-	std::cout << "\ttotal_intervals: " << this->total_intervals << std::endl;
-	std::cout << "\twriting_interval: " << this->writing_interval << std::endl;
-	std::cout << "\tresult_file: " << this->result_file << std::endl;
-	std::cout << "\ttrackers:" << std::endl;
-	for (auto iter = this->trackers.cbegin(); iter != this->trackers.cend(); ++iter)
-	{
-		std::cout << "\t\t" << iter->first << ":" << iter->second << std::endl;
-	}
+using std::cout, std::endl;
+
+dht_crawler::dht_crawler(std::string result_file, int session_num, int start_port, int total_intervals) {
+	m_total_intervals = total_intervals;
+	m_session_num = session_num;
+	m_start_port = start_port;
+	m_result_file = result_file;
 }
 
-void dht_crawler::run()
+void dht_crawler::print_settings() const 
 {
-	std::cout << "Starting running with" << std::endl;
-	this->print_settings(std::cout);
+	cout << "\tupload_rate_limit: " << m_upload_rate_limit << endl;
+	cout << "\tdownload_rate_limit: " << m_download_rate_limit << endl;
+	cout << "\tactive_downloads: " << m_active_downloads << endl;
+	cout << "\talert_queue_size: " << m_alert_queue_size << endl;
+	cout << "\tdht_announce_interval: " << m_dht_announce_interval << endl;
+	cout << "\ttorrent_upload_limit: " << m_torrent_upload_limit << endl;
+	cout << "\ttorrent_download_limit: " << m_torrent_download_limit << endl;
+	cout << "\tauto_manage_startup: " << m_auto_manage_startup << endl;
+	cout << "\tauto_manage_interval: " << m_auto_manage_interval << endl;
+	cout << "\tstart_port: " << m_start_port << endl;
+	cout << "\tsession_num: " << m_session_num << endl;
+	cout << "\ttotal_intervals: " << m_total_intervals << endl;
+	cout << "\twriting_interval: " << m_writing_interval << endl;
+	cout << "\tresult_file: " << m_result_file << endl;
+	cout << "\ttrackers:" << endl;
+
+	for (const auto &p : m_trackers)
+		cout << "\t\t" << p.first << ":" << p.second << endl;
+
+}
+
+void dht_crawler::run() {
+
+	cout << "Starting running with" << endl;
+	this->print_settings();
 
 	int intervals = 0;
-	while (intervals < total_intervals)
-	{
-		for (unsigned int i = 0; i < this->sessions.size(); ++i)
-		{
-			sessions[i]->post_torrent_updates();
-			auto alerts = new std::deque<libtorrent::alert*>;
-			sessions[i]->pop_alerts(alerts);
-			this->handle_alerts(sessions[i], alerts);
+	while (intervals < m_total_intervals) {
 
-			delete alerts;
+		for (unsigned i = 0; i < m_sessions.size(); ++i) {
+			std::vector<lt::alert*> alerts;
+			m_sessions.at(i)->post_torrent_updates();
+			m_sessions.at(i)->pop_alerts(&alerts);
+			this->handle_alerts(m_sessions.at(i), &alerts);
 		}
+
 		++intervals;
 
-		if (intervals % writing_interval == 0)
-		{
-			std::cout << "interval " << intervals << " done, writing result file...";
+		if (intervals % m_writing_interval == 0) {
+
+			cout << "interval " << intervals << " done, writing result file...";
 			if (this->write_result_file())
-			{
-				std::cout << " success." << std::endl;
-			}
+				cout << " success." << endl;
 			else
-			{
-				std::cout << " failed." << std::endl;
-			}
-			std::cout << "meta status: " << std::endl;
-			std::cout << "\tcount: " << meta.size() << std::endl;
+				cout << " failed." << endl;
+
+			cout << "meta status: " << endl;
+			cout << "\tcount: " << m_meta.size() << endl;
 		}
 
 		sleep(1);
 	}
 
-	std::cout << "Stopping running, writing result file..." << std::endl;
+	cout << "Stopping running, writing result file..." << endl;
 	if (this->write_result_file())
-	{
-		std::cout << " success." << std::endl;
-	}
+		cout << " success." << endl;
 	else
-	{
-		std::cout << " failed." << std::endl;
-	}
+		cout << " failed." << endl;
 
-	for (unsigned int i = 0; i < this->sessions.size(); ++i)
+	// TODO: bug sure
+	for (unsigned int i = 0; i < m_sessions.size(); ++i)
 	{
-		auto torrents = sessions[i]->get_torrents();
+		auto torrents = m_sessions[i]->get_torrents();
 		for (unsigned int j = 0; j < torrents.size(); ++j)
 		{
-			sessions[i]->remove_torrent(torrents[j]);
+			m_sessions[i]->remove_torrent(torrents[j]);
 		}
-		delete sessions[i];
+		// delete m_sessions[i]; 
 	}
 }
 
-void dht_crawler::handle_alerts(libtorrent::session* psession, std::deque<libtorrent::alert*>* palerts)
+void dht_crawler::handle_alerts(libtorrent::session* psession, std::vector<libtorrent::alert*>* palerts)
 {
 	while (palerts->size() > 0)
 	{
 		auto palert = palerts->front();
-		palerts->pop_front();
+		palerts->pop_back();
 		std::string info_hash;
 
 		switch (palert->type())
@@ -109,25 +102,26 @@ void dht_crawler::handle_alerts(libtorrent::session* psession, std::deque<libtor
 		case libtorrent::add_torrent_alert::alert_type:
 		{
 			auto p1 = (libtorrent::add_torrent_alert*) palert;
-			p1->handle.set_upload_limit(this->torrent_upload_limit);
-			p1->handle.set_download_limit(this->torrent_download_limit);
+			p1->handle.set_upload_limit(m_torrent_upload_limit);
+			p1->handle.set_download_limit(m_torrent_download_limit);
 			break;
 		}
 		case libtorrent::dht_announce_alert::alert_type:
 		{
 			auto p2 = (libtorrent::dht_announce_alert*) palert;
 			info_hash = p2->info_hash.to_string();
+
 			// update meta
 			// c++ map: if meta[info_hash] does not exist,
 			// it will be inserted and initialized to zero
-			if (meta[info_hash] > 0)
+			if (m_meta[info_hash] > 0)
 			{
-				++meta[info_hash];
+				++m_meta[info_hash];
 			}
 			else
 			{
-				meta[info_hash] = 1;
-				++this->current_meta_count;
+				m_meta[info_hash] = 1;
+				++m_current_meta_count;
 			}
 			break;
 		}
@@ -135,15 +129,15 @@ void dht_crawler::handle_alerts(libtorrent::session* psession, std::deque<libtor
 		{
 			auto p3 = (libtorrent::dht_get_peers_alert*) palert;
 			info_hash = p3->info_hash.to_string();
-			if (meta[info_hash] > 0)
+			if (m_meta[info_hash] > 0)
 			{
-				++meta[info_hash];
+				++m_meta[info_hash];
 			}
 			else
 			{
-				this->info_hash_from_getpeers.push_back(info_hash);
-				meta[info_hash] = 1;
-				++this->current_meta_count;
+				m_info_hash_from_getpeers.push_back(info_hash);
+				m_meta[info_hash] = 1;
+				++m_current_meta_count;
 			}
 			break;
 		}
@@ -151,35 +145,38 @@ void dht_crawler::handle_alerts(libtorrent::session* psession, std::deque<libtor
 			break;
 		}
 
-		delete palert;
+		// delete palert;
 	}
 }
 
 void dht_crawler::create_sessions()
 {
-	int& start_port = this->start_port;
+	int& start_port = m_start_port;
 
-	for (int i = 0; i < this->session_num; ++i)
+	for (int i = 0; i < m_session_num; ++i)
 	{
 		auto psession = new libtorrent::session;
-		psession->set_alert_mask(libtorrent::alert::category_t::all_categories);
-		psession->listen_on(std::make_pair(start_port + i, start_port + i));
+		//psession->set_alert_mask(libtorrent::alert::category_t::all_categories);
+		lt::error_code ec;
+		psession->listen_on(std::make_pair(start_port + i, start_port + i), ec);
 
-		for (int j = 0; j < this->trackers.size(); ++j)
+		for (int j = 0; j < m_trackers.size(); ++j)
 		{
-			psession->add_dht_router(trackers[j]);
+			psession->add_dht_router(m_trackers[j]);
 		}
 
-		libtorrent::session_settings settings = psession->settings();
-		settings.upload_rate_limit = this->upload_rate_limit;
-		settings.download_rate_limit = this->download_rate_limit;
-		settings.active_downloads = this->active_downloads;
-		settings.auto_manage_interval = this->auto_manage_interval;
-		settings.auto_manage_startup = this->auto_manage_startup;
-		settings.dht_announce_interval = this->dht_announce_interval;
-		settings.alert_queue_size = this->alert_queue_size;
-		psession->set_settings(settings);
-		this->sessions.push_back(psession);
+		auto settings = psession->get_settings();
+		/*
+		settings.upload_rate_limit = m_upload_rate_limit;
+		settings.download_rate_limit = m_download_rate_limit;
+		settings.active_downloads = m_active_downloads;
+		settings.auto_manage_interval = m_auto_manage_interval;
+		settings.auto_manage_startup = m_auto_manage_startup;
+		settings.dht_announce_interval = m_dht_announce_interval;
+		settings.alert_queue_size = m_alert_queue_size;
+		*/
+		//psession->set_settings(settings);
+		m_sessions.push_back(psession);
 	}
 }
 
@@ -191,11 +188,11 @@ void dht_crawler::add_magnet(std::string link)
 bool dht_crawler::write_result_file()
 {
 	std::fstream fs;
-	fs.open(this->result_file, std::fstream::out | std::fstream::trunc);
+	fs.open(m_result_file, std::fstream::out | std::fstream::trunc);
 
 	if (fs.is_open())
 	{
-		for (auto iter = this->meta.begin(); iter != this->meta.end(); ++iter)
+		for (auto iter = m_meta.begin(); iter != m_meta.end(); ++iter)
 		{
 			const std::string& s = iter->first;
 			for (unsigned int i = 0; i < s.size(); ++i)
@@ -212,7 +209,7 @@ bool dht_crawler::write_result_file()
 				}
 			}
 			fs << std::dec;
-			fs << '\t' << iter->second << std::endl;
+			fs << '\t' << iter->second << endl;
 		}
 		fs.close();
 		return true;
