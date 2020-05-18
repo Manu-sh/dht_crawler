@@ -43,8 +43,10 @@ void dht_crawler::run() {
 	cout << "Starting running with" << endl;
 	this->print_settings();
 
+	// sessione = client instance
 	for (unsigned intervals = 0; intervals < m_total_intervals;) {
 
+		// process data from every client
 		for (unsigned i = 0; i < m_sessions.size(); ++i) {
 			std::vector<lt::alert*> alerts;
 			m_sessions.at(i)->pop_alerts(&alerts);
@@ -74,6 +76,7 @@ void dht_crawler::run() {
 		cout << " failed." << endl;
 
 	// TODO: bug sure
+	// remove any torrent after some seconds
 	for (unsigned i = 0; i < m_sessions.size(); ++i) {
 
 		auto torrents = m_sessions[i]->get_torrents();
@@ -94,21 +97,17 @@ void dht_crawler::handle_alerts(libtorrent::session* psession, std::vector<libto
 
 		switch (palert->type()) {
 
-			case libtorrent::add_torrent_alert::alert_type:
-				{
-					auto p1 = (libtorrent::add_torrent_alert*) palert;
-					p1->handle.set_upload_limit(m_torrent_upload_limit);
-					p1->handle.set_download_limit(m_torrent_download_limit);
-					break;
-				}
 			case libtorrent::dht_announce_alert::alert_type:
 				{
+					// get infohash here
 					auto p2 = (libtorrent::dht_announce_alert*) palert;
 					info_hash = p2->info_hash.to_string();
 
 					// update meta
 					// c++ map: if meta[info_hash] does not exist,
 					// it will be inserted and initialized to zero
+
+					// meta is a rank for certain infohash
 					if (m_meta[info_hash] > 0)
 					{
 						++m_meta[info_hash];
@@ -122,6 +121,8 @@ void dht_crawler::handle_alerts(libtorrent::session* psession, std::vector<libto
 				}
 			case libtorrent::dht_get_peers_alert::alert_type:
 				{
+
+					// this
 					auto p3 = (libtorrent::dht_get_peers_alert*) palert;
 					info_hash = p3->info_hash.to_string();
 					if (m_meta[info_hash] > 0)
@@ -130,7 +131,8 @@ void dht_crawler::handle_alerts(libtorrent::session* psession, std::vector<libto
 					}
 					else
 					{
-						m_info_hash_from_getpeers.push_back(info_hash);
+						// this
+						m_info_hash_from_getpeers.push_back(info_hash); // add to a vector if is from getpeers (why?)
 						m_meta[info_hash] = 1;
 						++m_current_meta_count;
 					}
@@ -154,13 +156,16 @@ void dht_crawler::create_sessions() {
 		// psession->set_alert_mask(libtorrent::alert::category_t::all_categories);
 
 		lt::error_code ec;
+
+		// ogni client ha la porta del precedente + 1
 		psession->listen_on(std::make_pair(start_port + i, start_port + i), ec);
 
+		// vengono aggiunti dei tracker di default alla istanza del client
 		for (unsigned j = 0; j < m_trackers.size(); ++j)
 			psession->add_dht_router(m_trackers[j]);
 
+		// vengono aggiunte le impostazioni
 		auto settings = psession->get_settings();
-
 		namespace alert_type = lt::alert_category;
 		settings.set_int(lt::settings_pack::int_types::alert_mask, lt::alert::all_categories);
 
@@ -187,6 +192,7 @@ bool dht_crawler::write_result_file() {
 	if (!fs.is_open())
 		return false;
 
+	// viene salvato l'hash insieme alla sua frequenza su un file
 	for (auto iter = m_meta.begin(); iter != m_meta.end(); ++iter) {
 
 		const std::string &s = iter->first;
