@@ -132,7 +132,7 @@ void dht_crawler::handle_alerts(libtorrent::session* psession, std::vector<libto
 					else
 					{
 						// this
-						m_info_hash_from_getpeers.push_back(info_hash); // add to a vector if is from getpeers (why?)
+						m_info_hash_from_getpeers.push_back(info_hash); // add to a vector if is from getpeers (just as statistic)
 						m_meta[info_hash] = 1;
 						++m_current_meta_count;
 					}
